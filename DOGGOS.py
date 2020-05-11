@@ -20,7 +20,7 @@ class DOGGOS:
     Oxidation Of Gas and Grouped Organic Species'''
     
     def __init__(self, NO_i_ppb, NO2_i_ppb, O3_i_ppb, NO3_i_ppb, phenol_i_ppb, 
-                 cresol_i_ppb, simulation_time):
+                 cresol_i_ppb, simulation_time, initialize_time=None):
         # Instance variables of initial values for model
         self.NO = [NO_i_ppb]
         self.NO2 = [NO2_i_ppb]
@@ -37,6 +37,19 @@ class DOGGOS:
         self.temperature = 19.0
         self.RH = 0.5
         self.simulation_time = simulation_time
+        self.initialize_time = initialize_time
+        
+        if initialize_time:
+            finterp_NO2 = interpolate.interp1d(initialize_time, NO2_i_ppb)
+            NO2 = finterp_NO2(self.simulation_time[self.simulation_time 
+                                                   <= self.initialize_time[-1]])
+            self.NO2 = NO2.tolist()
+            
+            finterp_O3 = interpolate.interp1d(initialize_time, O3_i_ppb)
+            O3 = finterp_O3(self.simulation_time[self.simulation_time 
+                                                   <= self.initialize_time[-1]])
+            self.O3 = O3.tolist()
+            
         
         self.R1 = [0.0]
         self.R2 = [0.0]
@@ -109,21 +122,38 @@ class DOGGOS:
             y_current = y[1]
             y_ppb = [convert_molec_cm3_to_ppb(val) for val in y_current]
             
-            self.NO.append(y_ppb[0])
-            self.NO2.append(y_ppb[1])
-            self.O3.append(y_ppb[2])        
-            self.NO3.append(y_ppb[3])
-            self.N2O5.append(y_ppb[4])
-            self.phenol.append(y_ppb[5])
-            self.cresol.append(y_ppb[6])
-            self.product1.append(y_ppb[7])
-            self.product2.append(y_ppb[8])
-            self.product3.append(y_ppb[9])
-            self.HNO3.append(y_ppb[10])
-            self.NA.append(y_ppb[11])        
-                    
-            # next initial condition
-            y0 = y_current
+            if self.initialize_time and tspan[1] <= self.initialize_time[-1]:
+                self.NO.append(y_ppb[0])        
+                self.NO3.append(y_ppb[3])
+                self.N2O5.append(y_ppb[4])
+                self.phenol.append(y_ppb[5])
+                self.cresol.append(y_ppb[6])
+                self.product1.append(y_ppb[7])
+                self.product2.append(y_ppb[8])
+                self.product3.append(y_ppb[9])
+                self.HNO3.append(y_ppb[10])
+                self.NA.append(y_ppb[11])
+                
+                y0 = y_current
+                y0[1] = convert_ppb_to_molec_cm3(self.NO2[i])
+                y0[2] = convert_ppb_to_molec_cm3(self.O3[i])
+            
+            else:
+                self.NO.append(y_ppb[0])
+                self.NO2.append(y_ppb[1])
+                self.O3.append(y_ppb[2])        
+                self.NO3.append(y_ppb[3])
+                self.N2O5.append(y_ppb[4])
+                self.phenol.append(y_ppb[5])
+                self.cresol.append(y_ppb[6])
+                self.product1.append(y_ppb[7])
+                self.product2.append(y_ppb[8])
+                self.product3.append(y_ppb[9])
+                self.HNO3.append(y_ppb[10])
+                self.NA.append(y_ppb[11])        
+                        
+                # next initial condition
+                y0 = y_current
 
     def plot_main_results(self):
         fig, ax = plt.subplots(2,2, sharex=True, figsize=(10,7))
