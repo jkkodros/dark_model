@@ -38,7 +38,24 @@ class DOGGOS:
         self.RH = 0.5
         self.simulation_time = simulation_time
         
-        self.num_reactions = 17
+        self.R1 = [0.0]
+        self.R2 = [0.0]
+        self.R3 = [0.0]
+        self.R4 = [0.0]
+        self.R5 = [0.0]
+        self.R6 = [0.0]
+        self.R7 = [0.0]
+        self.R8 = [0.0]
+        self.R9 = [0.0]
+        self.R10 = [0.0]
+        self.R11 = [0.0]
+        self.R12 = [0.0]
+        self.R13 = [0.0]
+        self.R14 = [0.0]
+        self.R15 = [0.0]
+        self.R16 = [0.0]
+        self.R17 = [0.0]
+
         
     def run_model(self):
         # Tracers
@@ -57,12 +74,6 @@ class DOGGOS:
         
         y0 = [convert_ppb_to_molec_cm3(val) for val in y0_ppb]
         
-        # Define output matricies
-        reaction_rates = np.zeros((self.num_reactions, 
-                                   len(self.simulation_time)))
-        
-        species = np.zeros((len(y0), len(self.simulation_time)))
-        
         # Time step
         for i in range(1, len(self.simulation_time)):
             # span for next time step
@@ -71,17 +82,30 @@ class DOGGOS:
             # Reaction budgets
             R = reactions(y0, tspan[0], self.temperature, forward=False)
             
+            R_ppb = [convert_molec_cm3_to_ppb(val) for val in R]
+            self.R1.append(R_ppb[0])
+            self.R2.append(R_ppb[1])
+            self.R3.append(R_ppb[2])
+            self.R4.append(R_ppb[3])
+            self.R5.append(R_ppb[4])
+            self.R6.append(R_ppb[5])
+            self.R7.append(R_ppb[6])
+            self.R8.append(R_ppb[7])
+            self.R9.append(R_ppb[8])
+            self.R10.append(R_ppb[9])
+            self.R11.append(R_ppb[10])
+            self.R12.append(R_ppb[11])
+            self.R13.append(R_ppb[12])
+            self.R14.append(R_ppb[13])
+            self.R15.append(R_ppb[14])
+            self.R16.append(R_ppb[15])
+            self.R17.append(R_ppb[16])
+            
             # solve for next step
             forward=True
             y = integrate.odeint(reactions, y0, tspan, 
                                  args=(self.temperature, forward))
-            
-            # Save output for this timestep
-            for j in range(len(R)):
-                reaction_rates[j,i] = R[j]
-            #for k in range(len(y[0])):
-            #    species[k,i] = y[0][k]
-            
+                        
             y_current = y[1]
             y_ppb = [convert_molec_cm3_to_ppb(val) for val in y_current]
             
@@ -130,6 +154,39 @@ class DOGGOS:
         
         fig.tight_layout()
         plt.show()
+        return fig, ax
+    
+    def get_NO3_budget(self):
+        # Get fractional NO3 reaction budget
+        R_phenol = np.array(self.R8)
+        R_cresol = np.array(self.R10)
+        R_products = np.array(self.R11) + np.array(self.R13)
+        R_NOx = np.array(self.R3) + np.array(self.R6) + np.array(self.R7)
+        R_NO3_rates = [R_phenol, R_cresol, R_products, R_NOx]
+        
+        R_NO3 = [integrate.simps(R, 
+                                 x=self.simulation_time) for R in R_NO3_rates]
+
+        R_NO3 = R_NO3[:]/sum(R_NO3)
+            
+        reaction_labels = ['Phenol',
+                           'Cresol',
+                           'Products',
+                           'NO$_{x}$']
+        
+        return R_NO3, reaction_labels
+    
+    def plot_NO3_budget(self):
+        # Plot NO3 reaction budget
+        R_NO3, reaction_labels = self.get_NO3_budget()
+        
+        fig, ax = plt.subplots(figsize=(6,6))
+        ax.bar(np.arange(len(R_NO3)), R_NO3)
+        ax.set_xticks(np.arange(len(R_NO3)))
+        ax.set_xticklabels(reaction_labels, rotation=45, fontsize=16)
+        ax.set_ylabel('Percent of Reactions')
+        ax.set_title('NO$_{3}$ Reaction Budget')
+        fig.tight_layout()
         return fig, ax
             
 ###############################################################################
