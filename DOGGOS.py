@@ -35,7 +35,7 @@ class DOGGOS:
         self.product3 = [0.0]
         self.HNO3 = [0.0]
         self.NA = [0.0]
-        self.temperature = [temperature]
+        self.temperature = [temperature] 
         self.RH = [RH]
         self.simulation_time = np.array(simulation_time)
         self.initialize_time = np.array(initialize_time)
@@ -59,6 +59,10 @@ class DOGGOS:
             finterp_RH = interpolate.interp1d(experiment_time, RH)
             RH = finterp_RH(self.simulation_time)
             self.RH = RH.tolist()
+            
+        else:
+            self.temperature = [temperature] * len(simulation_time)
+            self.RH = [RH] * len(simulation_time)
             
         
         self.R1 = [0.0]
@@ -103,7 +107,8 @@ class DOGGOS:
             tspan = [self.simulation_time[i-1], self.simulation_time[i]]
             
             # Reaction budgets
-            R = reactions(y0, tspan[0], self.temperature[i], forward=False)
+            R = reactions(y0, tspan[0], self.temperature[i], self.RH[i], 
+                          forward=False)
             
             R_ppb = [convert_molec_cm3_to_ppb(val) for val in R]
             self.R1.append(R_ppb[0])
@@ -127,7 +132,8 @@ class DOGGOS:
             # solve for next step
             forward=True
             y = integrate.odeint(reactions, y0, tspan, 
-                                 args=(self.temperature[i], forward))
+                                 args=(self.temperature[i], self.RH[i], 
+                                       forward))
                         
             y_current = y[1]
             y_ppb = [convert_molec_cm3_to_ppb(val) for val in y_current]
@@ -248,7 +254,7 @@ class DOGGOS:
 ###############################################################################
 ### Box model reactions
 ###############################################################################
-def reactions(y, t, temperature, forward=True):
+def reactions(y, t, temperature, RH, forward=True):
     # This function defines the differential equations (the reactions)
     # of the model (dC/dt where C is a compound)
     # R1 NO + O3 --> NO2  (k1) 
@@ -273,7 +279,8 @@ def reactions(y, t, temperature, forward=True):
     k3 = 9.44E-10 * np.exp(-2509./(T_K))    
     K = 2.0E-27 * np.exp(11000./(T_K))  
     k4 = k3/K      
-    k5 = 2.5E-6
+    #k5 = 2.5E-6
+    k5 = calc_n2o5_uptake_rate(T_K, RH)
     k6 = 4.5E-14*np.exp(-1260./(T_K))
     k7 = 2.6E-11*np.exp(110./(T_K)) 
     k8 = 3.8E-13  
@@ -408,7 +415,32 @@ def reactions(y, t, temperature, forward=True):
                 dProduct1_dt, dProduct2_dt, dProduct3_dt, dHNO3_dt, dNA_dt]
     else:
         return [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14,
-                R15, Raux1, Raux2]        
+                R15, Raux1, Raux2]
+
+def calc_n2o5_uptake_rate(T_K, RH, aer_surf_area=7.4E8):
+    # Calculate N2O5 uptake (as first order reaction rate)
+    # Inputs: T in C, surface area in nm2 cm-3, dp in nm
+    # We change units below
+    k_b = 1.38E-23   # [J/K]
+    Dg = 2E-5 # diffusivity
+    #T_K = temperature + 273.15  #[K]
+    aer_surf_area *= (1/1E9)**2 * (100.)**3  #[m2 m-3]
+    #dp *= 1e-9   #[m]
+    
+    # I am making this up
+    m = (6E-3 - 1E-3)/(0.7 - 0.1)
+    b = 1E-3
+    #gamma_n2o5 = 0.006
+    gamma_n2o5 = m*RH + b
+    m = 1.79E-22 
+    c_n2o5 = ((8*k_b*T_K)/m)**(0.5)
+    
+    #rp = dp/2.
+    #k_n2o5 = ((rp/Dg) + (4.0/(c_n2o5*gamma_n2o5)))**-1 * aer_surf_area
+    
+    k_N2O5 = 1./4. * c_n2o5 * gamma_n2o5 * aer_surf_area
+
+    return k_N2O5        
         
 ###############################################################################
 ### Other helpful routines
