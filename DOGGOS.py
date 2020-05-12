@@ -250,6 +250,43 @@ class DOGGOS:
         ax.set_title('NO$_{3}$ Reaction Budget')
         fig.tight_layout()
         return fig, ax
+    
+    def write_results_csv(self, filename):
+        df = pd.DataFrame( {'relTime' : t})
+        df['NO_ppb'] = self.NO
+        df['NO2_ppb'] = self.NO2
+        df['O3_ppb'] = self.O3
+        df['NO3_ppb'] = self.NO3
+        df['N2O5_ppb'] = self.N2O5
+        df['phen_ppb'] = self.phenol
+        df['cres_ppb'] = self.cresol
+        df['VOC_ppb'] = np.array(self.phenol) + np.array(self.cresol)
+        df['product1'] = self.product1
+        df['product2'] = self.product2
+        df['product3'] = self.product3
+        df['HNO3_ppb'] = self.HNO3
+        df['NA_ppb'] = self.NA
+        
+        df['R1'] = self.R1
+        df['R2'] = self.R2
+        df['R3'] = self.R3
+        df['R4'] = self.R4
+        df['R5'] = self.R5
+        df['R6'] = self.R6
+        df['R7'] = self.R7
+        df['R8'] = self.R8
+        df['R9'] = self.R9
+        df['R10'] = self.R10
+        df['R11'] = self.R11
+        df['R12'] = self.R12
+        df['R13'] = self.R13
+        df['R14'] = self.R14
+        df['R15'] = self.R15
+        df['R16'] = self.R16
+        df['R17'] = self.R17
+
+        df.to_csv(filename+'.csv', index=False)
+        return df
             
 ###############################################################################
 ### Box model reactions
