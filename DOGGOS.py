@@ -37,8 +37,8 @@ class DOGGOS:
         self.NA = [0.0]
         self.temperature = [temperature]
         self.RH = [RH]
-        self.simulation_time = simulation_time
-        self.initialize_time = initialize_time
+        self.simulation_time = np.array(simulation_time)
+        self.initialize_time = np.array(initialize_time)
         
         if initialize_time.any():
             finterp_NO2 = interpolate.interp1d(initialize_time, NO2_i_ppb)
@@ -103,7 +103,7 @@ class DOGGOS:
             tspan = [self.simulation_time[i-1], self.simulation_time[i]]
             
             # Reaction budgets
-            R = reactions(y0, tspan[0], self.temperature, forward=False)
+            R = reactions(y0, tspan[0], self.temperature[i], forward=False)
             
             R_ppb = [convert_molec_cm3_to_ppb(val) for val in R]
             self.R1.append(R_ppb[0])
@@ -127,7 +127,7 @@ class DOGGOS:
             # solve for next step
             forward=True
             y = integrate.odeint(reactions, y0, tspan, 
-                                 args=(self.temperature, forward))
+                                 args=(self.temperature[i], forward))
                         
             y_current = y[1]
             y_ppb = [convert_molec_cm3_to_ppb(val) for val in y_current]
@@ -265,7 +265,7 @@ def reactions(y, t, temperature, forward=True):
     # R12 O3 + product1 --> product2
     # R13 NO3 + product2 --> product3
     
-    T_K = np.array([(temp + 273.15) for temp in temperature])
+    T_K = temperature + 273.15
     
     # Rate constants 
     k1 = 1.4E-12*np.exp(-1310./(T_K))        
