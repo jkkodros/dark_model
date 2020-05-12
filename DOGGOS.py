@@ -39,7 +39,7 @@ class DOGGOS:
         self.simulation_time = simulation_time
         self.initialize_time = initialize_time
         
-        if initialize_time:
+        if initialize_time.any():
             finterp_NO2 = interpolate.interp1d(initialize_time, NO2_i_ppb)
             NO2 = finterp_NO2(self.simulation_time[self.simulation_time 
                                                    <= self.initialize_time[-1]])
@@ -122,7 +122,7 @@ class DOGGOS:
             y_current = y[1]
             y_ppb = [convert_molec_cm3_to_ppb(val) for val in y_current]
             
-            if self.initialize_time and tspan[1] <= self.initialize_time[-1]:
+            if self.initialize_time.any() and tspan[1] <= self.initialize_time[-1]:
                 self.NO.append(y_ppb[0])        
                 self.NO3.append(y_ppb[3])
                 self.N2O5.append(y_ppb[4])
@@ -155,14 +155,19 @@ class DOGGOS:
                 # next initial condition
                 y0 = y_current
 
-    def plot_main_results(self):
+    def plot_main_results(self, time_exp=None, O3_exp=None, NO2_exp=None,
+                          phenol_exp=None, cresol_exp=None):
         fig, ax = plt.subplots(2,2, sharex=True, figsize=(10,7))
         
+        if time_exp.any() and O3_exp.any():
+            ax[0,0].plot(time_exp, O3_exp, 'o', color='red')
         ax[0,0].plot(self.simulation_time/3600., self.O3, color='red')
         ax[0,0].set_ylabel('O$_{3}$ [ppb]')
-        ax[0,0].set_xlim(0)
+        ax[0,0].set_xlim(0, self.simulation_time[-1]/3600.)
         ax[0,0].set_ylim(0)
         
+        if time_exp.any() and NO2_exp.any():
+            ax[0,1].plot(time_exp, NO2_exp, 'o', color='green')
         ax[0,1].plot(self.simulation_time/3600., self.NO2, color='green')
         ax[0,1].set_ylabel('NO$_{2}$ [ppb]')
         ax[0,1].set_ylim(0)
@@ -175,12 +180,16 @@ class DOGGOS:
         ax[1,1].set_ylim(0)
         ax[1,1].legend(['NO$_{3}$ [ppt]', 'N$_{2}$O$_{5}$ [ppb]'])
 
+        if time_exp.any() and phenol_exp.any():
+            ax[1,0].plot(time_exp, phenol_exp, 'o', color='C0')
+        if time_exp.any() and phenol_exp.any():
+            ax[1,0].plot(time_exp, cresol_exp, 'o', color='C1')
         ax[1,0].plot(self.simulation_time/3600., self.phenol, color='C0')
         ax[1,0].plot(self.simulation_time/3600., self.cresol, color='C1')
         ax[1,0].legend(['Phenol', 'Cresol'])
         ax[1,0].set_xlabel('Time [hr]')
         ax[1,0].set_ylabel('VOC [ppb]')
-        ax[1,0].set_ylim(0)
+        ax[1,0].set_ylim(0, max(self.phenol))
         
         fig.tight_layout()
         plt.show()
@@ -363,8 +372,6 @@ def reactions(y, t, temperature, forward=True):
     else:
         Raux2 = 0.0
 
-
-        
     # time differentials
     dNO_dt = (R6) - (R1 + R7) 
     dNO2_dt = (R1 + R4 + R6 + 2*R7 + R11) - (R2 + R3 + R6 + Raux2)
