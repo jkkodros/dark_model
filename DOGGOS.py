@@ -20,7 +20,8 @@ class DOGGOS:
     Oxidation Of Gas and Grouped Organic Species'''
     
     def __init__(self, NO_i_ppb, NO2_i_ppb, O3_i_ppb, NO3_i_ppb, phenol_i_ppb, 
-                 cresol_i_ppb, simulation_time, initialize_time=None):
+                 cresol_i_ppb, simulation_time, temperature=19.0, RH=0.5,
+                 initialize_time=np.array([None]), experiment_time=np.array([None])):
         # Instance variables of initial values for model
         self.NO = [NO_i_ppb]
         self.NO2 = [NO2_i_ppb]
@@ -34,8 +35,8 @@ class DOGGOS:
         self.product3 = [0.0]
         self.HNO3 = [0.0]
         self.NA = [0.0]
-        self.temperature = 19.0
-        self.RH = 0.5
+        self.temperature = [temperature]
+        self.RH = [RH]
         self.simulation_time = simulation_time
         self.initialize_time = initialize_time
         
@@ -49,6 +50,15 @@ class DOGGOS:
             O3 = finterp_O3(self.simulation_time[self.simulation_time 
                                                    <= self.initialize_time[-1]])
             self.O3 = O3.tolist()
+            
+        if experiment_time.any():
+            finterp_T = interpolate.interp1d(experiment_time, temperature)
+            temperature = finterp_T(self.simulation_time)
+            self.temperature = temperature.tolist()
+            
+            finterp_RH = interpolate.interp1d(experiment_time, RH)
+            RH = finterp_RH(self.simulation_time)
+            self.RH = RH.tolist()
             
         
         self.R1 = [0.0]
@@ -155,9 +165,16 @@ class DOGGOS:
                 # next initial condition
                 y0 = y_current
 
-    def plot_main_results(self, time_exp=None, O3_exp=None, NO2_exp=None,
-                          phenol_exp=None, cresol_exp=None):
+    def plot_main_results(self, time_exp=[None], O3_exp=[None], NO2_exp=[None],
+                          phenol_exp=[None], cresol_exp=[None]):
         fig, ax = plt.subplots(2,2, sharex=True, figsize=(10,7))
+        
+        time_exp = np.array(time_exp)
+        O3_exp = np.array(O3_exp)
+        NO2_exp = np.array(NO2_exp)
+        phenol_exp = np.array(phenol_exp)
+        cresol_exp = np.array(cresol_exp)
+        
         
         if time_exp.any() and O3_exp.any():
             ax[0,0].plot(time_exp, O3_exp, 'o', color='red')
@@ -248,7 +265,7 @@ def reactions(y, t, temperature, forward=True):
     # R12 O3 + product1 --> product2
     # R13 NO3 + product2 --> product3
     
-    T_K = temperature + 273.15
+    T_K = np.array([(temp + 273.15) for temp in temperature])
     
     # Rate constants 
     k1 = 1.4E-12*np.exp(-1310./(T_K))        
