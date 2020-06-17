@@ -11,17 +11,19 @@ import numpy as np
 import pandas as pd
 from scipy import integrate
 from scipy import interpolate
-from functools import partial
 import matplotlib.pyplot as plt
 import sys
+
 
 class DOGGOS:
     '''Class decleration for simple dark chemistry box model: Dark
     Oxidation Of Gas and Grouped Organic Species'''
-    
-    def __init__(self, NO_i_ppb, NO2_i_ppb, O3_i_ppb, NO3_i_ppb, phenol_i_ppb, 
+
+    def __init__(self, NO_i_ppb, NO2_i_ppb, O3_i_ppb, NO3_i_ppb, phenol_i_ppb,
                  cresol_i_ppb, simulation_time, temperature=19.0, RH=0.5,
-                 initialize_time=np.array([None]), experiment_time=np.array([None])):
+                 initialize_time=np.array([None]),
+                 experiment_time=np.array([None])):
+
         # Instance variables of initial values for model
         self.NO = [NO_i_ppb]
         self.NO2 = [NO2_i_ppb]
@@ -35,36 +37,37 @@ class DOGGOS:
         self.product3 = [0.0]
         self.HNO3 = [0.0]
         self.NA = [0.0]
-        self.temperature = [temperature] 
+        self.temperature = [temperature]
         self.RH = [RH]
         self.simulation_time = np.array(simulation_time)
         self.initialize_time = np.array(initialize_time)
-        
+
         if initialize_time.any():
             finterp_NO2 = interpolate.interp1d(initialize_time, NO2_i_ppb)
-            NO2 = finterp_NO2(self.simulation_time[self.simulation_time 
-                                                   <= self.initialize_time[-1]])
+            NO2 = finterp_NO2(
+                self.simulation_time[self.simulation_time <=
+                                     self.initialize_time[-1]])
             self.NO2 = NO2.tolist()
-            
+
             finterp_O3 = interpolate.interp1d(initialize_time, O3_i_ppb)
-            O3 = finterp_O3(self.simulation_time[self.simulation_time 
-                                                   <= self.initialize_time[-1]])
+            O3 = finterp_O3(
+                self.simulation_time[self.simulation_time <=
+                                     self.initialize_time[-1]])
             self.O3 = O3.tolist()
-            
+
         if experiment_time.any():
             finterp_T = interpolate.interp1d(experiment_time, temperature)
             temperature = finterp_T(self.simulation_time)
             self.temperature = temperature.tolist()
-            
+
             finterp_RH = interpolate.interp1d(experiment_time, RH)
             RH = finterp_RH(self.simulation_time)
             self.RH = RH.tolist()
-            
+
         else:
             self.temperature = [temperature] * len(simulation_time)
             self.RH = [RH] * len(simulation_time)
-            
-        
+
         self.R1 = [0.0]
         self.R2 = [0.0]
         self.R3 = [0.0]
@@ -82,106 +85,118 @@ class DOGGOS:
         self.R15 = [0.0]
         self.R16 = [0.0]
         self.R17 = [0.0]
-
         
-    def run_model(self):
+    def _initialize_tracers(self):
+        ''' Convience function to assign initial tracer concentrations
+        into the y0_ppb list'''
+
         # Tracers
         y0_ppb = [self.NO[0],
                   self.NO2[0],
                   self.O3[0],
                   self.NO3[0],
                   self.N2O5[0],
-                  self.phenol[0], 
+                  self.phenol[0],
                   self.cresol[0],
                   self.product1[0],
                   self.product2[0],
                   self.product3[0],
                   self.HNO3[0],
                   self.NA[0]]
-        
         y0 = [convert_ppb_to_molec_cm3(val) for val in y0_ppb]
-        
+        return y0
+    
+    def _store_rxn_budget(self, R_ppb):
+        '''Convience function to store and update reactions'''
+        self.R1.append(R_ppb[0])
+        self.R2.append(R_ppb[1])
+        self.R3.append(R_ppb[2])
+        self.R4.append(R_ppb[3])
+        self.R5.append(R_ppb[4])
+        self.R6.append(R_ppb[5])
+        self.R7.append(R_ppb[6])
+        self.R8.append(R_ppb[7])
+        self.R9.append(R_ppb[8])
+        self.R10.append(R_ppb[9])
+        self.R11.append(R_ppb[10])
+        self.R12.append(R_ppb[11])
+        self.R13.append(R_ppb[12])
+        self.R14.append(R_ppb[13])
+        self.R15.append(R_ppb[14])
+        self.R16.append(R_ppb[15])
+        self.R17.append(R_ppb[16])
+
+    def _store_tracers(self, y_ppb, initialize_period=False):
+        if initialize_period:
+            self.NO.append(y_ppb[0])
+            self.NO3.append(y_ppb[3])
+            self.N2O5.append(y_ppb[4])
+            self.phenol.append(y_ppb[5])
+            self.cresol.append(y_ppb[6])
+            self.product1.append(y_ppb[7])
+            self.product2.append(y_ppb[8])
+            self.product3.append(y_ppb[9])
+            self.HNO3.append(y_ppb[10])
+            self.NA.append(y_ppb[11])
+        else:
+            self.NO.append(y_ppb[0])
+            self.NO2.append(y_ppb[1])
+            self.O3.append(y_ppb[2])
+            self.NO3.append(y_ppb[3])
+            self.N2O5.append(y_ppb[4])
+            self.phenol.append(y_ppb[5])
+            self.cresol.append(y_ppb[6])
+            self.product1.append(y_ppb[7])
+            self.product2.append(y_ppb[8])
+            self.product3.append(y_ppb[9])
+            self.HNO3.append(y_ppb[10])
+            self.NA.append(y_ppb[11])
+
+    def run_model(self):
+        # Set initial tracer values into y0 list units: molec cm-3
+        y0 = self._initialize_tracers()
+
         # Time step
         for i in range(1, len(self.simulation_time)):
-            # span for next time step
+            # Time span for next step
             tspan = [self.simulation_time[i-1], self.simulation_time[i]]
-            
+
             # Reaction budgets
-            R = reactions(y0, tspan[0], self.temperature[i], self.RH[i], 
+            R = reactions(y0, tspan[0], self.temperature[i], self.RH[i],
                           forward=False)
-            
             R_ppb = [convert_molec_cm3_to_ppb(val) for val in R]
-            self.R1.append(R_ppb[0])
-            self.R2.append(R_ppb[1])
-            self.R3.append(R_ppb[2])
-            self.R4.append(R_ppb[3])
-            self.R5.append(R_ppb[4])
-            self.R6.append(R_ppb[5])
-            self.R7.append(R_ppb[6])
-            self.R8.append(R_ppb[7])
-            self.R9.append(R_ppb[8])
-            self.R10.append(R_ppb[9])
-            self.R11.append(R_ppb[10])
-            self.R12.append(R_ppb[11])
-            self.R13.append(R_ppb[12])
-            self.R14.append(R_ppb[13])
-            self.R15.append(R_ppb[14])
-            self.R16.append(R_ppb[15])
-            self.R17.append(R_ppb[16])
-            
+            self._store_rxn_budget(R_ppb)
+
             # solve for next step
-            forward=True
-            y = integrate.odeint(reactions, y0, tspan, 
-                                 args=(self.temperature[i], self.RH[i], 
+            forward = True
+            y = integrate.odeint(reactions, y0, tspan,
+                                 args=(self.temperature[i], self.RH[i],
                                        forward))
-                        
             y_current = y[1]
             y_ppb = [convert_molec_cm3_to_ppb(val) for val in y_current]
-            
-            if self.initialize_time.any() and tspan[1] <= self.initialize_time[-1]:
-                self.NO.append(y_ppb[0])        
-                self.NO3.append(y_ppb[3])
-                self.N2O5.append(y_ppb[4])
-                self.phenol.append(y_ppb[5])
-                self.cresol.append(y_ppb[6])
-                self.product1.append(y_ppb[7])
-                self.product2.append(y_ppb[8])
-                self.product3.append(y_ppb[9])
-                self.HNO3.append(y_ppb[10])
-                self.NA.append(y_ppb[11])
-                
+
+            if (self.initialize_time.any() and
+                    tspan[1] <= self.initialize_time[-1]):
+                self._store_tracers(y_ppb, initialize_period=True)
                 y0 = y_current
                 y0[1] = convert_ppb_to_molec_cm3(self.NO2[i])
                 y0[2] = convert_ppb_to_molec_cm3(self.O3[i])
-            
+
             else:
-                self.NO.append(y_ppb[0])
-                self.NO2.append(y_ppb[1])
-                self.O3.append(y_ppb[2])        
-                self.NO3.append(y_ppb[3])
-                self.N2O5.append(y_ppb[4])
-                self.phenol.append(y_ppb[5])
-                self.cresol.append(y_ppb[6])
-                self.product1.append(y_ppb[7])
-                self.product2.append(y_ppb[8])
-                self.product3.append(y_ppb[9])
-                self.HNO3.append(y_ppb[10])
-                self.NA.append(y_ppb[11])        
-                        
+                self._store_tracers(y_ppb, initialize_period=False)
                 # next initial condition
                 y0 = y_current
 
     def plot_main_results(self, time_exp=[None], O3_exp=[None], NO2_exp=[None],
                           phenol_exp=[None], cresol_exp=[None]):
-        fig, ax = plt.subplots(2,2, sharex=True, figsize=(10,7))
-        
+        fig, ax = plt.subplots(2, 2, sharex=True, figsize=(10, 7))
+
         time_exp = np.array(time_exp)
         O3_exp = np.array(O3_exp)
         NO2_exp = np.array(NO2_exp)
         phenol_exp = np.array(phenol_exp)
         cresol_exp = np.array(cresol_exp)
-        
-        
+
         if time_exp.any() and O3_exp.any():
             ax[0,0].plot(time_exp, O3_exp, 'o', color='red')
         ax[0,0].plot(self.simulation_time/3600., self.O3, color='red')
@@ -217,7 +232,7 @@ class DOGGOS:
         fig.tight_layout()
         plt.show()
         return fig, ax
-    
+
     def get_NO3_budget(self):
         # Get fractional NO3 reaction budget
         R_phenol = np.array(self.R8)
@@ -225,23 +240,21 @@ class DOGGOS:
         R_products = np.array(self.R11) + np.array(self.R13)
         R_NOx = np.array(self.R3) + np.array(self.R6) + np.array(self.R7)
         R_NO3_rates = [R_phenol, R_cresol, R_products, R_NOx]
-        
-        R_NO3 = [integrate.simps(R, 
+
+        R_NO3 = [integrate.simps(R,
                                  x=self.simulation_time) for R in R_NO3_rates]
 
         R_NO3 = R_NO3[:]/sum(R_NO3)
-            
+
         reaction_labels = ['Phenol',
                            'Cresol',
                            'Products',
                            'NO$_{x}$']
-        
         return R_NO3, reaction_labels
-    
+
     def plot_NO3_budget(self):
         # Plot NO3 reaction budget
-        R_NO3, reaction_labels = self.get_NO3_budget()
-        
+        R_NO3, reaction_labels = self.get_NO3_budget()        
         fig, ax = plt.subplots(figsize=(6,6))
         ax.bar(np.arange(len(R_NO3)), R_NO3)
         ax.set_xticks(np.arange(len(R_NO3)))
@@ -250,9 +263,9 @@ class DOGGOS:
         ax.set_title('NO$_{3}$ Reaction Budget')
         fig.tight_layout()
         return fig, ax
-    
+
     def write_results_csv(self, filename):
-        df = pd.DataFrame( {'relTime' : t})
+        df = pd.DataFrame( {'Time' : self.simulation_time})
         df['NO_ppb'] = self.NO
         df['NO2_ppb'] = self.NO2
         df['O3_ppb'] = self.O3
